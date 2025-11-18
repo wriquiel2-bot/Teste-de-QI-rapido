@@ -287,7 +287,7 @@ export default function Home() {
       }
 
       // Redirecionar para o Kiwify com email como parâmetro
-      const kiwifyUrl = `https://pay.kiwify.com.br/MnYsExS?email=${encodeURIComponent(email)}`
+      const kiwifyUrl = `https://pay.kiwify.com.br/tuCgVCt?email=${encodeURIComponent(email)}`
       window.open(kiwifyUrl, '_blank')
 
       // Após alguns segundos, redirecionar para a página do laudo

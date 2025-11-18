@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Brain, TrendingUp, Award, Loader2, RefreshCw } from "lucide-react"
+import { CheckCircle2, Brain, TrendingUp, Award, Loader2, RefreshCw, AlertCircle, Settings } from "lucide-react"
 
 interface TestResult {
   iq_score: number
@@ -21,6 +21,8 @@ export default function LaudoContent() {
   const [result, setResult] = useState<TestResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [verifying, setVerifying] = useState(false)
+  const [verifyError, setVerifyError] = useState("")
 
   useEffect(() => {
     if (!sessionId) {
@@ -46,6 +48,50 @@ export default function LaudoContent() {
       setError("Erro ao carregar o laudo. Tente novamente.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleVerifyPayment = async () => {
+    if (!result?.customer_email) {
+      setVerifyError("Email não encontrado. Tente recarregar a página.")
+      return
+    }
+
+    setVerifying(true)
+    setVerifyError("")
+    
+    try {
+      console.log('🔍 Iniciando verificação de pagamento para:', result.customer_email)
+      
+      const response = await fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: result.customer_email
+        })
+      })
+
+      const data = await response.json()
+      console.log('📥 Resposta da verificação:', data)
+
+      if (data.ok) {
+        // Recarregar resultado
+        console.log('✅ Pagamento verificado! Recarregando...')
+        await fetchTestResult()
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
+      } else {
+        console.error('❌ Erro na verificação:', data.error)
+        setVerifyError(data.error || 'Erro ao verificar pagamento')
+      }
+    } catch (err) {
+      console.error('❌ Erro ao verificar pagamento:', err)
+      setVerifyError('Erro de conexão. Verifique sua internet e tente novamente.')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -98,19 +144,84 @@ export default function LaudoContent() {
             <span className="text-3xl">⏳</span>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Aguardando Pagamento</h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-4">
             Seu teste foi concluído! Assim que confirmarmos seu pagamento, você receberá acesso ao resultado completo.
           </p>
           <p className="text-sm text-gray-500 mb-6">
             Isso geralmente leva alguns minutos. Você pode atualizar esta página.
           </p>
-          <Button 
-            onClick={() => window.location.reload()}
-            className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
-          >
-            <RefreshCw className="mr-2 w-4 h-4" />
-            Atualizar Página
-          </Button>
+          
+          {verifyError && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="text-left flex-1">
+                  <p className="text-sm font-semibold text-red-900 mb-2">Erro ao verificar pagamento</p>
+                  <p className="text-sm text-red-800 leading-relaxed mb-3">{verifyError}</p>
+                  
+                  {(verifyError.includes('JWT') || verifyError.includes('API') || verifyError.includes('expirada') || verifyError.includes('Configuração')) && (
+                    <div className="bg-red-100 p-3 rounded-lg border border-red-300">
+                      <p className="text-xs font-bold text-red-900 mb-2 flex items-center">
+                        <Settings className="w-4 h-4 mr-1" />
+                        Como resolver:
+                      </p>
+                      <ol className="text-xs text-red-900 space-y-1 list-decimal list-inside">
+                        <li>Vá em <strong>Configurações do Projeto</strong></li>
+                        <li>Clique em <strong>Integrações</strong></li>
+                        <li>Encontre <strong>Supabase</strong></li>
+                        <li>Clique em <strong>Reconectar</strong> ou <strong>Conectar</strong></li>
+                        <li>Volte aqui e tente novamente</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <Button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+            >
+              <RefreshCw className="mr-2 w-4 h-4" />
+              Atualizar Página
+            </Button>
+            
+            <Button 
+              onClick={handleVerifyPayment}
+              disabled={verifying}
+              variant="outline"
+              className="w-full border-2 border-orange-600 text-orange-600 hover:bg-orange-50"
+            >
+              {verifying ? (
+                <>
+                  <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 w-4 h-4" />
+                  Já Paguei - Verificar Agora
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-xs text-blue-900 font-semibold mb-1">
+              💡 Pagamento já foi aprovado?
+            </p>
+            <p className="text-xs text-blue-800">
+              Clique em "Já Paguei - Verificar Agora" para liberar seu laudo imediatamente.
+            </p>
+          </div>
+
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-xs text-gray-600">
+              <strong>Email do teste:</strong> {result.customer_email}
+            </p>
+          </div>
         </Card>
       </div>
     )
