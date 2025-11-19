@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { ShoppingCart, Brain, CheckCircle2, ArrowRight } from "lucide-react"
+import { ShoppingCart, Brain, CheckCircle2, ArrowRight, CreditCard } from "lucide-react"
+import Link from "next/link"
 
 // Perguntas do teste de QI - 35 perguntas
 const questions = [
@@ -400,7 +401,7 @@ export default function Home() {
               </Button>
               
               <p className="text-xs text-gray-600 mt-4">
-                🔒 Pagamento 100% seguro • ⚡ Receba seu laudo instantaneamente
+                🔒 Pagamento 100% seguro via Kiwify • ⚡ Receba seu laudo instantaneamente
               </p>
             </div>
 

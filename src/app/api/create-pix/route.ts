@@ -6,52 +6,57 @@ export async function POST(request: NextRequest) {
     const { email, name, cpf, phone, amount = 5.00 } = body
 
     // Validações
-    if (!email || !name || !cpf) {
+    if (!email || !name) {
       return NextResponse.json(
-        { error: 'Email, nome e CPF são obrigatórios' },
+        { error: 'Email e nome são obrigatórios' },
         { status: 400 }
       )
     }
 
-    // Verificar se o Access Token do Mercado Pago está configurado
-    const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
+    // Verificar se o Token da Kiwify está configurado
+    const kiwifyToken = process.env.KIWIFY_API_TOKEN
 
-    if (!accessToken) {
+    if (!kiwifyToken) {
       return NextResponse.json(
         { 
-          error: 'Mercado Pago não configurado',
-          message: 'Configure a variável MERCADO_PAGO_ACCESS_TOKEN nas configurações do projeto'
+          error: 'Kiwify não configurado',
+          message: 'Configure a variável KIWIFY_API_TOKEN nas configurações do projeto.',
+          instructions: [
+            '1. Acesse sua conta na Kiwify: https://dashboard.kiwify.com.br',
+            '2. Vá em Configurações → Integrações → API',
+            '3. Copie seu Token de API',
+            '4. Adicione como variável de ambiente: KIWIFY_API_TOKEN'
+          ]
         },
         { status: 500 }
       )
     }
 
-    // Criar pagamento Pix no Mercado Pago
+    // Criar pagamento na Kiwify
     const paymentData = {
-      transaction_amount: amount,
-      description: 'Teste de QI - Laudo Completo',
-      payment_method_id: 'pix',
-      payer: {
+      product_id: process.env.KIWIFY_PRODUCT_ID || 'seu_produto_id',
+      customer: {
         email: email,
-        first_name: name.split(' ')[0],
-        last_name: name.split(' ').slice(1).join(' ') || name.split(' ')[0],
-        identification: {
-          type: 'CPF',
-          number: cpf.replace(/\D/g, '')
-        }
+        name: name,
+        cpf: cpf?.replace(/\D/g, ''),
+        phone: phone?.replace(/\D/g, '')
+      },
+      payment: {
+        method: 'pix',
+        amount: Number(amount) * 100 // Kiwify usa centavos
       }
     }
 
-    console.log('🔄 Criando pagamento Pix no Mercado Pago...')
+    console.log('🔄 Criando pagamento Pix na Kiwify...')
     console.log('📧 Email:', email)
     console.log('👤 Nome:', name)
     console.log('💰 Valor:', amount)
 
-    const response = await fetch('https://api.mercadopago.com/v1/payments', {
+    const response = await fetch('https://api.kiwify.com.br/v1/orders', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
+        'Authorization': `Bearer ${kiwifyToken}`
       },
       body: JSON.stringify(paymentData)
     })
@@ -59,29 +64,47 @@ export async function POST(request: NextRequest) {
     const data = await response.json()
 
     if (!response.ok) {
-      console.error('❌ Erro do Mercado Pago:', data)
+      console.error('❌ Erro da Kiwify:', data)
+      
+      if (response.status === 401) {
+        return NextResponse.json(
+          { 
+            error: 'Token de API inválido',
+            message: 'Verifique se você está usando o Token correto da Kiwify.',
+            instructions: [
+              '1. Acesse: https://dashboard.kiwify.com.br',
+              '2. Vá em Configurações → Integrações → API',
+              '3. Copie o Token de API',
+              '4. Atualize a variável KIWIFY_API_TOKEN'
+            ],
+            details: data
+          },
+          { status: 401 }
+        )
+      }
+
       return NextResponse.json(
         { 
           error: 'Erro ao gerar Pix',
-          details: data.message || 'Erro desconhecido'
+          message: data.message || 'Erro desconhecido',
+          details: data
         },
         { status: response.status }
       )
     }
 
-    console.log('✅ Pagamento Pix criado com sucesso!')
-    console.log('🆔 Payment ID:', data.id)
-    console.log('🔑 Chave Pix gerada!')
+    console.log('✅ Pagamento Pix criado com sucesso na Kiwify!')
+    console.log('🆔 Order ID:', data.id)
 
     // Retornar dados do Pix
     return NextResponse.json({
       success: true,
-      payment_id: data.id,
-      qr_code: data.point_of_interaction?.transaction_data?.qr_code,
-      qr_code_base64: data.point_of_interaction?.transaction_data?.qr_code_base64,
-      ticket_url: data.point_of_interaction?.transaction_data?.ticket_url,
-      expiration_date: data.date_of_expiration,
-      amount: data.transaction_amount
+      order_id: data.id,
+      qr_code: data.pix?.qr_code,
+      qr_code_base64: data.pix?.qr_code_base64,
+      payment_url: data.payment_url,
+      amount: amount,
+      status: data.status
     })
 
   } catch (error) {
